@@ -1206,7 +1206,7 @@ void EnvironmentNAVXYTHETALATTICE::PrecomputeActionswithCompleteMotionPrimitive(
 
                 previnterm3Dcell = intermediate2dCell;
             }
-
+#if USE_ORIGINAL_HEURISTIC
             // compute linear and angular time
             double linear_distance = 0;
             for (unsigned int i = 1; i < EnvNAVXYTHETALATCfg.ActionsV[tind][aind].intermptV.size(); i++) {
@@ -1231,7 +1231,10 @@ void EnvironmentNAVXYTHETALATTICE::PrecomputeActionswithCompleteMotionPrimitive(
                     (int)(ceil(NAVXYTHETALAT_COSTMULT_MTOMM * std::max(linear_time, angular_time)));
             // use any additional cost multiplier
             EnvNAVXYTHETALATCfg.ActionsV[tind][aind].cost *= motionprimitiveV->at(mind).additionalactioncostmult;
-
+#else
+            // Minimum-time heuristic
+            EnvNAVXYTHETALATCfg.ActionsV[tind][aind].cost = EnvNAVXYTHETALATCfg.ActionsV[tind][aind].intermptV.size() - 1;
+#endif
             // now compute the intersecting cells for this motion (including ignoring the source footprint)
             get_2d_motion_cells(
                     EnvNAVXYTHETALATCfg.FootprintPolygon,
@@ -3156,8 +3159,16 @@ int EnvironmentNAVXYTHETALAT::GetGoalHeuristic(int stateID)
     int hEuclid = (int)(NAVXYTHETALAT_COSTMULT_MTOMM *
             EuclideanDistance_m(HashEntry->X, HashEntry->Y, EnvNAVXYTHETALATCfg.EndX_c, EnvNAVXYTHETALATCfg.EndY_c));
 
+#if USE_ORIGINAL_HEURISTIC
     // define this function if it is used in the planner (heuristic backward search would use it)
     return (int)(((double)__max(h2D, hEuclid)) / EnvNAVXYTHETALATCfg.nominalvel_mpersecs);
+#else
+    // Minimize time
+    double distance_in_mm = __max(h2D, hEuclid);
+    double time_in_sec = distance_in_mm / (EnvNAVXYTHETALATCfg.nominalvel_mpersecs * 1000); // m -> mm
+    int time_in_timesteps = time_in_sec * 10; // dt = 0.1
+    return time_in_timesteps;
+#endif
 }
 
 int EnvironmentNAVXYTHETALAT::GetStartHeuristic(int stateID)
